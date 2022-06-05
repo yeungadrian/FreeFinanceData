@@ -10,6 +10,10 @@ jupyterlab~=3.0
 kedro==0.17.7
 kedro-telemetry~=0.1.0
 nbstripout~=0.4
+pandas
+psycopg2
+pyarrow
+pydantic
 pytest-cov~=3.0
 pytest-mock>=1.7.1, <2.0
 pytest~=6.2

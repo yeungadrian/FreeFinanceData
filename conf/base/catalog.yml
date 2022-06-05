@@ -6,3 +6,11 @@
 json_dataset:
   type: json.JSONDataSet
   filepath: data/01_raw/location.json
+
+fund_codes:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/fund_codes.parquet
+
+fund_prices:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/fund_prices.parquet
