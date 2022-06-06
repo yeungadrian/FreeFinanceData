@@ -14,3 +14,7 @@ fund_codes:
 fund_prices:
   type: pandas.ParquetDataSet
   filepath: data/01_raw/fund_prices.parquet
+
+ff_5_factor:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/ff_5_daily.CSV
