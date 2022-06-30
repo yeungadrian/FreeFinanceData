@@ -144,34 +144,34 @@ class Metrics(BaseModel):
         start_date = portfolio["date"][0]
         end_date = portfolio["date"].iat[-1]
 
-        # Number of years calculation could be improved, do difference in months and pretend always at end of month
         number_years = (end_date - start_date).days / 365.25
 
         # Needs to be dynamically loaded eventually
         risk_free = 0.01
 
-        month_end_projection = portfolio[portfolio["date"].dt.is_month_end].reset_index(
-            drop=True
+        monthly_portfolio = portfolio.loc[
+            portfolio["date"].dt.is_month_end
+        ].reset_index(drop=True)
+
+        annual_portfolio = portfolio.groupby(pd.Grouper(freq="Y")).agg(
+            {"portfolio": "last"}
         )
 
-        month_end_projection["monthlyReturn"] = (
-            month_end_projection["portfolio"]
-            / month_end_projection["portfolio"].shift(periods=1)
+        monthly_portfolio["return"] = (
+            monthly_portfolio["portfolio"]
+            / monthly_portfolio["portfolio"].shift(periods=1)
         ) - 1
 
-        monthly_returns = month_end_projection[["date", "monthlyReturn"]].dropna(
-            axis="index"
-        )
+        monthly_returns = monthly_portfolio[["date", "return"]].dropna(axis="index")
         monthly_returns["date"] = monthly_returns["date"].dt.strftime("%Y-%m-%d")
 
         cagr = self.calculate_cagr(
             end_value=end_value, start_value=start_value, number_years=number_years
         )
-        negative_returns = month_end_projection[
-            month_end_projection["monthlyReturn"] < 0
-        ]
-        monthly_std = self.calculate_std(returns=month_end_projection["monthlyReturn"])
-        negative_std = self.calculate_std(returns=negative_returns["monthlyReturn"])
+        negative_returns = monthly_portfolio.loc[monthly_portfolio["return"] < 0]
+
+        monthly_std = self.calculate_std(returns=monthly_portfolio["return"])
+        negative_std = self.calculate_std(returns=negative_returns["return"])
 
         sharpe_ratio = self.calculate_portfolio_ratio(
             portfolio_return=cagr, risk_free=risk_free, std=monthly_std
@@ -181,14 +181,40 @@ class Metrics(BaseModel):
             portfolio_return=cagr, risk_free=risk_free, std=negative_std
         )
 
+        '''
+        Monthly vs Annualised
+        - Arithmetic Mean
+        - Geometric Mean
+        - Standard Deviation
+        - Downside Deviation
+        - Maximum Drawdown
+        - Market Correlation
+        - Beta
+        - Alpha
+        - R^2
+        - Sharpe Ratio
+        - Sortino Ratio
+        - Treynor Ratio
+        - Calmar Ratio
+        - Active Return
+        - Tracking Error
+        - Information Ratio
+        - Skewness
+        - Excess Kurtosis
+        - HVaR
+        - Upside Capture Ratio
+        - Downside Capture Ratio
+        - Positive Periods
+        '''
+
         result = {
-            "cagr": cagr,
-            "monthly_std": monthly_std,
             "downside_std": negative_std,
+            "cagr": cagr,
             "sharpe_ratio": sharpe_ratio,
             "sortino_ratio": sortino_ratio,
             "max_drawdown": min(portfolio["drawdown"]),
-            "monthlyReturns": monthly_returns,
+            "monthly_returns": monthly_returns,
+            "monthly_std": monthly_std,
         }
 
         return result
