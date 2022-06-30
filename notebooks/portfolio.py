@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel
+import statsmodels.formula.api as smf
 from typing import List, TypeVar, Optional, Dict
 
 PandasDataFrame = TypeVar("pandas.core.frame.DataFrame")
@@ -98,8 +99,6 @@ class Portfolio(BaseModel):
                 start_period = strategy_slice.iloc[-1]["date"]
 
             result = pd.concat(portfolio_history)
-            result["date"] = result["date"].dt.strftime("%Y-%m-%d")
-
         else:
             self.timeseries = self.normalise_index(self.timeseries)
 
@@ -108,113 +107,4 @@ class Portfolio(BaseModel):
         return result
 
 
-class Metrics(BaseModel):
-    def calculate_cagr(self, end_value, start_value, number_years):
 
-        return np.power(end_value / start_value, 1 / number_years) - 1
-
-    def calculate_std(self, returns):
-        if len(returns) < 2:
-            result = 0
-        else:
-            result = np.std(returns)
-        return result
-
-    def calculate_ratio(self, portfolio_return, risk_free, std):
-        if std == 0:
-            result = None
-        else:
-            result = (portfolio_return - risk_free) / std
-        return result
-
-    def calculate_historical_max(self, portfolio):
-        max_values = []
-        for i in range(0, len(portfolio["portfolio"])):
-            if len(max_values) == 0:
-                max_values.append(portfolio["portfolio"][i])
-            else:
-                max_values.append(max(portfolio["portfolio"][i], max_values[i - 1]))
-
-        return max_values
-
-    def calculate_metrics(self, portfolio):
-        start_value = portfolio["portfolio"][0]
-        end_value = portfolio["portfolio"].iat[-1]
-
-        start_date = portfolio["date"][0]
-        end_date = portfolio["date"].iat[-1]
-
-        number_years = (end_date - start_date).days / 365.25
-
-        # Needs to be dynamically loaded eventually
-        risk_free = 0.01
-
-        monthly_portfolio = portfolio.loc[
-            portfolio["date"].dt.is_month_end
-        ].reset_index(drop=True)
-
-        annual_portfolio = portfolio.groupby(pd.Grouper(freq="Y")).agg(
-            {"portfolio": "last"}
-        )
-
-        monthly_portfolio["return"] = (
-            monthly_portfolio["portfolio"]
-            / monthly_portfolio["portfolio"].shift(periods=1)
-        ) - 1
-
-        monthly_returns = monthly_portfolio[["date", "return"]].dropna(axis="index")
-        monthly_returns["date"] = monthly_returns["date"].dt.strftime("%Y-%m-%d")
-
-        cagr = self.calculate_cagr(
-            end_value=end_value, start_value=start_value, number_years=number_years
-        )
-        negative_returns = monthly_portfolio.loc[monthly_portfolio["return"] < 0]
-
-        monthly_std = self.calculate_std(returns=monthly_portfolio["return"])
-        negative_std = self.calculate_std(returns=negative_returns["return"])
-
-        sharpe_ratio = self.calculate_portfolio_ratio(
-            portfolio_return=cagr, risk_free=risk_free, std=monthly_std
-        )
-
-        sortino_ratio = self.calculate_portfolio_ratio(
-            portfolio_return=cagr, risk_free=risk_free, std=negative_std
-        )
-
-        '''
-        Monthly vs Annualised
-        - Arithmetic Mean
-        - Geometric Mean
-        - Standard Deviation
-        - Downside Deviation
-        - Maximum Drawdown
-        - Market Correlation
-        - Beta
-        - Alpha
-        - R^2
-        - Sharpe Ratio
-        - Sortino Ratio
-        - Treynor Ratio
-        - Calmar Ratio
-        - Active Return
-        - Tracking Error
-        - Information Ratio
-        - Skewness
-        - Excess Kurtosis
-        - HVaR
-        - Upside Capture Ratio
-        - Downside Capture Ratio
-        - Positive Periods
-        '''
-
-        result = {
-            "downside_std": negative_std,
-            "cagr": cagr,
-            "sharpe_ratio": sharpe_ratio,
-            "sortino_ratio": sortino_ratio,
-            "max_drawdown": min(portfolio["drawdown"]),
-            "monthly_returns": monthly_returns,
-            "monthly_std": monthly_std,
-        }
-
-        return result

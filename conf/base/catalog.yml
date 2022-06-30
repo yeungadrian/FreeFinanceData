@@ -18,3 +18,7 @@ fund_prices:
 ff_5_factor:
   type: pandas.CSVDataSet
   filepath: data/01_raw/ff_5_daily.CSV
+
+sp500:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/sp500.CSV
