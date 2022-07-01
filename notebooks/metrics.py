@@ -3,6 +3,7 @@ import pandas as pd
 from pydantic import BaseModel
 import statsmodels.formula.api as smf
 
+
 class Metrics(BaseModel):
     def calculate_returns(self, series):
         return (series / series.shift(periods=1)) - 1
@@ -31,22 +32,23 @@ class Metrics(BaseModel):
         return result
 
     def calculate_drawdown(self, portfolio):
-        rolling_max = portfolio['portfolio'].cummax()
-        drawdown = portfolio['portfolio']/rolling_max - 1.0
-        
+        rolling_max = portfolio["portfolio"].cummax()
+        drawdown = portfolio["portfolio"] / rolling_max - 1.0
+
         return drawdown
 
     def market_correlation(self, portfolio, market):
         return np.corrcoef(portfolio, market)
 
-    def regress_market(data):
-        model = smf.ols(
-            formula=f"portfolio ~ market", data=data
-        )
-  
+    def regress_market(self, data):
+        model = smf.ols(formula=f"portfolio_returns ~ market_returns", data=data)
         results = model.fit()
 
-        return results
+        return (
+            results.params["Intercept"],
+            results.params["market_returns"],
+            results.rsquared,
+        )
 
     def calculate_metrics(self, portfolio):
 
@@ -67,36 +69,49 @@ class Metrics(BaseModel):
             drop=True
         )
 
-        monthly_portfolio["return"] = self.calculate_returns(
+        monthly_portfolio["portfolio_returns"] = self.calculate_returns(
             monthly_portfolio["portfolio"]
         )
-        annual_portfolio["return"] = self.calculate_returns(
+        monthly_portfolio["market_returns"] = self.calculate_returns(
+            monthly_portfolio["market"]
+        )
+        annual_portfolio["portfolio_returns"] = self.calculate_returns(
             annual_portfolio["portfolio"]
         )
+        annual_portfolio["market_returns"] = self.calculate_returns(
+            annual_portfolio["market"]
+        )
+        monthly_portfolio = monthly_portfolio.dropna().reset_index()
+        annual_portfolio = annual_portfolio.dropna().reset_index()
 
-        arithmetic_mean_m = monthly_portfolio["return"].mean()
+        arithmetic_mean_m = monthly_portfolio["portfolio_returns"].mean()
         geometric_mean_m = self.calculate_geometric_mean(
-            monthly_portfolio["return"].values
+            monthly_portfolio["portfolio_returns"].values
         )
 
-        arithmetic_mean_y = self.annualise_returns(
-            arithmetic_mean_m
-        )
-        geometric_mean_y = self.annualise_returns(
-            geometric_mean_m
-        )
+        arithmetic_mean_y = self.annualise_returns(arithmetic_mean_m)
+        geometric_mean_y = self.annualise_returns(geometric_mean_m)
 
         cagr = self.calculate_cagr(
             end_value=end_value, start_value=start_value, n_years=n_years
         )
 
-        negative_returns = monthly_portfolio.loc[monthly_portfolio["return"] < 0]
+        negative_returns = monthly_portfolio.loc[
+            monthly_portfolio["portfolio_returns"] < 0
+        ]
 
-        monthly_std = self.calculate_std(returns=monthly_portfolio["return"])
-        negative_std = self.calculate_std(returns=negative_returns["return"])
+        monthly_std = self.calculate_std(returns=monthly_portfolio["portfolio_returns"])
+        negative_std = self.calculate_std(returns=negative_returns["portfolio_returns"])
 
         daily_drawdowns = self.calculate_drawdown(portfolio)
         max_drawdown = daily_drawdowns.min()
+
+        market_correlation = np.corrcoef(
+            monthly_portfolio["portfolio_returns"].values,
+            monthly_portfolio["market_returns"].values,
+        )[0, 1]
+
+        alpha, beta, r_squared = self.regress_market(monthly_portfolio)
 
         sharpe_ratio = self.calculate_ratio(
             portfolio_return=cagr, risk_free=risk_free, std=monthly_std
@@ -106,21 +121,14 @@ class Metrics(BaseModel):
             portfolio_return=cagr, risk_free=risk_free, std=negative_std
         )
 
+        treynor_ratio = self.calculate_ratio(
+            portfolio_return=cagr, risk_free=risk_free, std=beta
+        )
+
+        calmar_ratio = cagr / max_drawdown
+
         """
         Monthly vs Annualised
-        - Arithmetic Mean
-        - Geometric Mean
-        - Standard Deviation
-        - Downside Deviation
-        - Maximum Drawdown
-        - Market Correlation
-        - Beta
-        - Alpha
-        - R^2
-        - Sharpe Ratio
-        - Sortino Ratio
-        - Treynor Ratio
-        - Calmar Ratio
         - Active Return
         - Tracking Error
         - Information Ratio
@@ -139,11 +147,16 @@ class Metrics(BaseModel):
             "geometric_mean_y": geometric_mean_y,
             "std_m": monthly_std,
             "std_downside": negative_std,
+            "market_correlation": market_correlation,
+            "alpha": alpha,
+            "beta": beta,
+            "r_squared": r_squared,
             "cagr": cagr,
             "sharpe_ratio": sharpe_ratio,
             "sortino_ratio": sortino_ratio,
+            "treynor_ratio": treynor_ratio,
+            "calmar_ratio": calmar_ratio,
             "max_drawdown": max_drawdown,
-            
         }
 
         return result
