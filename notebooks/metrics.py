@@ -16,12 +16,17 @@ class Metrics(BaseModel):
         return result
 
     def calculate_geometric_mean(self, series):
-        return np.power(np.prod(series), len(series))
+        return np.power(np.prod(series + 1.0) , 1 / len(series))- 1.0
 
     def annualise_returns(self, value):
         return np.power(1 + value, 12) - 1
 
-    def calculate_cagr(self, end_value, start_value, n_years):
+    def calculate_cagr(self, series, dates):
+        start_value = series[0]
+        end_value = series.iloc[-1]
+        start_date = dates[0]
+        end_date = dates.iloc[-1]
+        n_years = (end_date - start_date).days / 365.25
         return np.power(end_value / start_value, 1 / n_years) - 1
 
     def calculate_ratio(self, portfolio_return, risk_free, std):
@@ -55,12 +60,6 @@ class Metrics(BaseModel):
         # Needs to be dynamically loaded eventually
         risk_free = 0.01
 
-        start_value = portfolio["portfolio"][0]
-        end_value = portfolio["portfolio"].iat[-1]
-        start_date = portfolio["date"][0]
-        end_date = portfolio["date"].iat[-1]
-        n_years = (end_date - start_date).days / 365.25
-
         monthly_portfolio = portfolio.loc[
             portfolio["date"].dt.is_month_end
         ].reset_index(drop=True)
@@ -93,7 +92,11 @@ class Metrics(BaseModel):
         geometric_mean_y = self.annualise_returns(geometric_mean_m)
 
         cagr = self.calculate_cagr(
-            end_value=end_value, start_value=start_value, n_years=n_years
+            portfolio['portfolio'], portfolio['date']
+        )
+
+        market_cagr = self.calculate_cagr(
+            portfolio['market'], portfolio['date']
         )
 
         negative_returns = monthly_portfolio.loc[
@@ -104,7 +107,7 @@ class Metrics(BaseModel):
         negative_std = self.calculate_std(returns=negative_returns["portfolio_returns"])
 
         daily_drawdowns = self.calculate_drawdown(portfolio)
-        max_drawdown = daily_drawdowns.min()
+        max_drawdown = daily_drawdowns.min() * -1.0
 
         market_correlation = np.corrcoef(
             monthly_portfolio["portfolio_returns"].values,
@@ -127,11 +130,12 @@ class Metrics(BaseModel):
 
         calmar_ratio = cagr / max_drawdown
 
+        active_error = cagr - market_cagr
+        tracking_error = self.calculate_std( monthly_portfolio["portfolio_returns"] - monthly_portfolio["market_returns"] )
+        information_ratio = active_error/tracking_error
+
+
         """
-        Monthly vs Annualised
-        - Active Return
-        - Tracking Error
-        - Information Ratio
         - Skewness
         - Excess Kurtosis
         - HVaR
@@ -146,7 +150,7 @@ class Metrics(BaseModel):
             "geometric_mean_m": geometric_mean_m,
             "geometric_mean_y": geometric_mean_y,
             "std_m": monthly_std,
-            "std_downside": negative_std,
+            "std_downside_m": negative_std,
             "market_correlation": market_correlation,
             "alpha": alpha,
             "beta": beta,
@@ -157,6 +161,9 @@ class Metrics(BaseModel):
             "treynor_ratio": treynor_ratio,
             "calmar_ratio": calmar_ratio,
             "max_drawdown": max_drawdown,
+            "active_error": active_error,
+            "tracking_error": tracking_error,
+            "information_ratio": information_ratio
         }
 
         return result
