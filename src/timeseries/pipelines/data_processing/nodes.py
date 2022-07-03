@@ -3,67 +3,31 @@ This is a boilerplate pipeline 'data_processing'
 generated using Kedro 0.17.0
 """
 
+from dotenv import load_dotenv
+import numpy as np
+import os
 import pandas as pd
 import psycopg2 as pg
-from dotenv import load_dotenv
-import os
-import requests
+from scipy.interpolate import PchipInterpolator
 
 load_dotenv()
 
-import asyncio
+
+def interpolate_curve(curve):
+    curve = curve.iloc[1:]
+    curve.columns = ["tenor", "value"]
+    curve.loc[:, "tenor"] = [1, 2, 3, 6, 12, 24, 36, 60, 90, 120, 240, 360]
+
+    curve = curve.dropna()
+
+    g = PchipInterpolator(curve["tenor"], curve["value"], extrapolate=True)
+    tenors = np.linspace(0, 360, 61, endpoint=True)
+    values = g(tenors)
+
+    return tenors, values
 
 
-def background(f):
-    def wrapped(*args, **kwargs):
-        return asyncio.get_event_loop().run_in_executor(None, f, *args, **kwargs)
-
-    return wrapped
-
-
-@background
-def load_kline_data(symbol, columns):
-    kline_url = (
-        f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=1"
-    )
-    r = requests.get(url=kline_url)
-    data = r.json()
-    df = pd.DataFrame(data[0][:-1]).transpose()
-
-    df.columns = columns
-    df["StartTime"] = pd.to_datetime(df["StartTime"], utc=True, unit="ms").dt.strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-    (df["EndTime"],) = pd.to_datetime(df["EndTime"], utc=True, unit="ms").dt.strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-    df[
-        [
-            "Open",
-            "High",
-            "Low",
-            "Close",
-            "Volume",
-            "QuoteVolume",
-            "BuyBaseVolume",
-            "BuyQuoteVolume",
-        ]
-    ] = df[
-        [
-            "Open",
-            "High",
-            "Low",
-            "Close",
-            "Volume",
-            "QuoteVolume",
-            "BuyBaseVolume",
-            "BuyQuoteVolume",
-        ]
-    ].apply(
-        pd.to_numeric
-    )
-    df.insert(loc=0, column="Symbol", value=symbol)
-    data = tuple(df.loc[0])
+def historical_us_treasury_curves(hello:str):
 
     db_name = os.getenv("DATABASE")
     host = os.getenv("HOST")
@@ -71,76 +35,54 @@ def load_kline_data(symbol, columns):
     password = os.getenv("POSTPASSWORD")
     port = os.getenv("PORT")
 
-    conn = pg.connect(
-        dbname=db_name, user=user, password=password, host=host, port=port,
+    all_treasuries = pd.read_csv(
+        "https://home.treasury.gov/system/files/276/yield-curve-rates-1990-2021.csv"
     )
 
-    query = """
-        INSERT INTO kline
-        (symbol, starttime, open, high, low, close, volume, endtime, quotevolume, numtrades, buybasevolume, buyquotevolume)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """
+    all_treasuries.Date = pd.to_datetime(all_treasuries.Date)
 
-    # try to execute query
-    # context manager automatically rolls back failed transactions
-    try:
-        cursor = conn.cursor()
-        cursor.execute(query=query, vars=data)
-        conn.commit()
+    for i in range(all_treasuries.shape[0]):
+        treasury_curve = all_treasuries.iloc[i]
+        old_treasury = treasury_curve.reset_index()
+        curve_date = treasury_curve.Date.strftime('%Y-%m-%d')
 
-    # ensure connection is closed
-    finally:
-        conn.close()
+        tenors, values = interpolate_curve(old_treasury)
 
+        curve_data = pd.DataFrame(
+            {"tenor": tenors, "value": values}
+        )
 
-def load_timeseries(hello: str):
-    """Preprocesses the data for shuttles.
+        curve_data["tenor"] = curve_data["tenor"] / 12
+        curve_data["value"] = curve_data["value"] / 100.0
+        
+        curve_values = list(
+            zip(
+                np.tile("us_treasury", curve_data.shape[0]),
+                np.tile(curve_date, curve_data.shape[0]),
+                curve_data["tenor"],
+                curve_data["value"],
+            )
+        )
 
-    Args:
-        shuttles: Raw data.
-    Returns:
-        Preprocessed data, with `price` converted to a float and `d_check_complete`,
-        `moon_clearance_complete` converted to boolean.
-    """
-    columns = [
-        "StartTime",
-        "Open",
-        "High",
-        "Low",
-        "Close",
-        "Volume",
-        "EndTime",
-        "QuoteVolume",
-        "NumTrades",
-        "BuyBaseVolume",
-        "BuyQuoteVolume",
-    ]
+        for j in curve_values:
+            query = """
+                INSERT INTO curve
+                (curve_name, date, tenor, value)
+                VALUES (%s,%s,%s,%s)
+                """
 
-    symbol_list = [
-        "BTCUSDT",
-        "ETHUSDT",
-        "BNBUSDT",
-        "BCCUSDT",
-        "NEOUSDT",
-        "LTCUSDT",
-        "QTUMUSDT",
-        "ADAUSDT",
-        "XRPUSDT",
-        "EOSUSDT",
-        "TUSDUSDT",
-        "IOTAUSDT",
-        "XLMUSDT",
-        "ONTUSDT",
-        "TRXUSDT",
-        "ETCUSDT",
-        "ICXUSDT",
-        "VENUSDT",
-        "NULSUSDT",
-        "VETUSDT",
-    ]
+            conn = pg.connect(
+                dbname=db_name, user=user, password=password, host=host, port=port,
+            )
 
-    for symbol in symbol_list:
-        load_kline_data(symbol, columns)
+            # try to execute query
+            # context manager automatically rolls back failed transactions
+            try:
+                cursor = conn.cursor()
+                cursor.execute(query=query, vars=j)
+                conn.commit()
 
-    return "Loaded Some Data"
-
+            # ensure connection is closed
+            finally:
+                conn.close()
+            

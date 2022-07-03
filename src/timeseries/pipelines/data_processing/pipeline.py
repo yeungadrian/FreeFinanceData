@@ -4,17 +4,17 @@ generated using Kedro 0.17.7
 """
 
 from kedro.pipeline import Pipeline, node, pipeline
-from timeseries.pipelines.data_processing.nodes import load_timeseries
+from timeseries.pipelines.data_processing.nodes import historical_us_treasury_curves
 
 
 def create_pipeline(**kwargs) -> Pipeline:
     return pipeline(
         [
             node(
-                func=load_timeseries,
+                func=historical_us_treasury_curves,
                 inputs="json_dataset",
                 outputs=None,
-                name="load_timeseries",
+                name="load_historical_us_treasury",
             ),
         ]
     )
