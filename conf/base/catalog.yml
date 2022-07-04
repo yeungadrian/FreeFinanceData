@@ -3,9 +3,9 @@
 # Documentation for this file format can be found in "The Data Catalog"
 # Link: https://kedro.readthedocs.io/en/stable/05_data/01_data_catalog.html
 
-json_dataset:
+curves:
   type: json.JSONDataSet
-  filepath: data/01_raw/location.json
+  filepath: data/01_raw/curves.json
 
 fund_codes:
   type: pandas.ParquetDataSet

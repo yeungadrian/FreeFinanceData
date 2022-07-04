@@ -13,10 +13,12 @@ def register_pipelines() -> Dict[str, Pipeline]:
 
     """
     data_processing_pipeline = dp.create_pipeline()
+    daily_us_treasury = dp.create_daily_pipeline()
     notification_pipeline = nf.create_pipeline()
 
     return {
         "__default__": data_processing_pipeline,
         "data_processing": data_processing_pipeline,
+        "something": daily_us_treasury,
         "email_notifications": notification_pipeline,
     }
