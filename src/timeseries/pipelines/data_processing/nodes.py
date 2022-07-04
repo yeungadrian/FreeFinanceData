@@ -97,7 +97,7 @@ def load_curves(mapping):
     return all_treasuries
 
 
-def historical_us_treasury_curves(mapping):
+def historical_us_treasury(mapping):
 
     all_treasuries = load_curves(mapping)
 
@@ -111,7 +111,7 @@ def historical_us_treasury_curves(mapping):
         for j in curve_values:
             insert_curve(j)
 
-def daily_us_treasury_curves(mapping):
+def daily_us_treasury(mapping):
 
     last_business_day = (pd.Timestamp.today() - pd.offsets.BMonthEnd(1)).strftime('%Y-%m-%d')
 
