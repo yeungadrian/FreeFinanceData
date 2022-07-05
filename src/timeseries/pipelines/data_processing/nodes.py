@@ -4,6 +4,7 @@ generated using Kedro 0.17.0
 """
 
 from dotenv import load_dotenv
+import logging
 import numpy as np
 import os
 import pandas as pd
@@ -107,7 +108,7 @@ def historical_us_treasury(mapping):
         curve_date = all_treasuries.Date.iloc[i].strftime('%Y-%m-%d')
 
         curve_values = interpolate_curve(treasury, curve_date)
-
+        logging.info('Inserting US treasury for %s',curve_date)
         for j in curve_values:
             insert_curve(j)
 
@@ -121,6 +122,8 @@ def daily_us_treasury(mapping):
     curve_date = last_business_day
 
     curve_values = interpolate_curve(curve, curve_date)
+
+    logging.info('Inserting US treasury for %s',curve_date)
     
     for j in curve_values:
         insert_curve(j)
