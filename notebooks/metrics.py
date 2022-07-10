@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel
 import statsmodels.formula.api as smf
+from pydantic import BaseModel
 
 
 class Metrics(BaseModel):
@@ -46,7 +46,9 @@ class Metrics(BaseModel):
         return np.corrcoef(portfolio, market)[0, 1]
 
     def regress_market(self, data):
-        model = smf.ols(formula=f"portfolio_returns ~ market_returns", data=data)
+        model = smf.ols(
+            formula="portfolio_returns ~ market_returns", data=data
+        )
         results = model.fit()
 
         return (
@@ -60,24 +62,30 @@ class Metrics(BaseModel):
         # Needs to be dynamically loaded eventually
         risk_free = 0.01
 
-        portfolio_m = portfolio.loc[portfolio["date"].dt.is_month_end].reset_index(
-            drop=True
-        )
+        portfolio_m = portfolio.loc[
+            portfolio["date"].dt.is_month_end
+        ].reset_index(drop=True)
 
-        portfolio_y = portfolio.loc[portfolio["date"].dt.is_year_end].reset_index(
-            drop=True
-        )
+        portfolio_y = portfolio.loc[
+            portfolio["date"].dt.is_year_end
+        ].reset_index(drop=True)
 
-        portfolio_m["portfolio_returns"] = self.returns(portfolio_m["portfolio"])
+        portfolio_m["portfolio_returns"] = self.returns(
+            portfolio_m["portfolio"]
+        )
         portfolio_m["market_returns"] = self.returns(portfolio_m["market"])
         portfolio_m = portfolio_m.dropna().reset_index()
 
-        portfolio_y["portfolio_returns"] = self.returns(portfolio_y["portfolio"])
+        portfolio_y["portfolio_returns"] = self.returns(
+            portfolio_y["portfolio"]
+        )
         portfolio_y["market_returns"] = self.returns(portfolio_y["market"])
         portfolio_y = portfolio_y.dropna().reset_index()
 
         arithmetic_mean_m = portfolio_m["portfolio_returns"].mean()
-        geometric_mean_m = self.geometric_mean(portfolio_m["portfolio_returns"].values)
+        geometric_mean_m = self.geometric_mean(
+            portfolio_m["portfolio_returns"].values
+        )
 
         arithmetic_mean_y = self.annualise_returns(arithmetic_mean_m)
         geometric_mean_y = self.annualise_returns(geometric_mean_m)
@@ -86,10 +94,12 @@ class Metrics(BaseModel):
 
         market_cagr = self.cagr(portfolio["market"], portfolio["date"])
 
-        negative_returns = portfolio_m.loc[portfolio_m["portfolio_returns"] < 0]
+        negative_returns = portfolio_m.loc[
+            portfolio_m["portfolio_returns"] < 0
+        ]
 
-        monthly_std = self.std(returns=portfolio_m["portfolio_returns"])
-        negative_std = self.std(returns=negative_returns["portfolio_returns"])
+        monthly_std = self.std(portfolio_m["portfolio_returns"])
+        negative_std = self.std(negative_returns["portfolio_returns"])
 
         daily_drawdowns = self.drawdown(portfolio)
         max_drawdown = daily_drawdowns.min() * -1.0
@@ -109,7 +119,9 @@ class Metrics(BaseModel):
             portfolio_return=cagr, risk_free=risk_free, std=negative_std
         )
 
-        treynor_ratio = self.ratio(portfolio_return=cagr, risk_free=risk_free, std=beta)
+        treynor_ratio = self.ratio(
+            portfolio_return=cagr, risk_free=risk_free, std=beta
+        )
 
         calmar_ratio = cagr / max_drawdown
 
@@ -119,8 +131,12 @@ class Metrics(BaseModel):
         )
         information_ratio = active_error / tracking_error
 
-        positive_market_periods = portfolio_m.loc[portfolio_m["market_returns"] > 0]
-        negative_market_periods = portfolio_m.loc[portfolio_m["market_returns"] < 0]
+        positive_market_periods = portfolio_m.loc[
+            portfolio_m["market_returns"] > 0
+        ]
+        negative_market_periods = portfolio_m.loc[
+            portfolio_m["market_returns"] < 0
+        ]
 
         upside_capture_ratio = self.geometric_mean(
             positive_market_periods["portfolio_returns"]
