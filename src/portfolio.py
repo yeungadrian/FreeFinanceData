@@ -1,8 +1,9 @@
+from typing import List, Optional, TypeVar
+
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel
 import statsmodels.formula.api as smf
-from typing import List, TypeVar, Optional, Dict
+from pydantic import BaseModel
 
 PandasDataFrame = TypeVar("pandas.core.frame.DataFrame")
 
@@ -49,16 +50,22 @@ class Portfolio(BaseModel):
 
         if self.rebalance:
             weights = [i / sum(self.amounts) for i in self.amounts]
-            rebalance_frequency = self.frequency_map[self.rebalance_frequency.lower()]
+            rebalance_frequency = self.frequency_map[
+                self.rebalance_frequency.lower()
+            ]
 
             date_range = pd.Series(
-                pd.date_range(start=self.start_date, end=self.end_date, freq="D")
+                pd.date_range(
+                    start=self.start_date, end=self.end_date, freq="D"
+                )
             )
-            month_end_dates = date_range[date_range.dt.is_month_end].reset_index(
-                drop=True
-            )
+            month_end_dates = date_range[
+                date_range.dt.is_month_end
+            ].reset_index(drop=True)
             rebalancing_dates = (
-                month_end_dates[month_end_dates.index % rebalance_frequency == 0]
+                month_end_dates[
+                    month_end_dates.index % rebalance_frequency == 0
+                ]
                 .reset_index(drop=True)
                 .dt.strftime("%Y-%m-%d")
                 .values.tolist()
@@ -89,7 +96,9 @@ class Portfolio(BaseModel):
 
                 amounts = np.multiply(weights, current_total)
 
-                strategy_slice = self.backtest_portfolio(amounts, price_timeseries)
+                strategy_slice = self.backtest_portfolio(
+                    amounts, price_timeseries
+                )
 
                 current_total = strategy_slice.iloc[-1]["portfolio"]
                 duplicate = 0 if i == 0 else 1
@@ -105,6 +114,3 @@ class Portfolio(BaseModel):
             result = self.backtest_portfolio(self.amounts, self.timeseries)
 
         return result
-
-
-

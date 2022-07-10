@@ -1,17 +1,15 @@
 defaults:
-  - process: process1
-  - model: model1
   - _self_
 
-raw: 
-  path: data/raw/sample.csv
+data:
+  raw:
+    sp500: ../data/raw/sp500.csv
+    fffactor: ../data/raw/ff_5_factor.parquet
+    prices: ../data/raw/fund_prices.parquet
 
-processed:
-  dir: data/processed
-  name: processed.csv
-  path: ${processed.dir}/${processed.name}
-
-final:
-  dir: data/final
-  name: final.csv
-  path: ${final.dir}/${final.name}
+curve:
+  treasury:
+    historical: https://home.treasury.gov/system/files/276/yield-curve-rates-1990-2021.csv
+    daily: https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202207?type=daily_treasury_yield_curve&field_tdr_date_value_month=202207&page&_format=csv
+  gilt:
+    daily: None
