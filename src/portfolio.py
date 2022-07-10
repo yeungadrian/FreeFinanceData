@@ -2,7 +2,6 @@ from typing import List, Optional, TypeVar
 
 import numpy as np
 import pandas as pd
-import statsmodels.formula.api as smf
 from pydantic import BaseModel
 
 PandasDataFrame = TypeVar("pandas.core.frame.DataFrame")
